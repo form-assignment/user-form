@@ -1,0 +1,9 @@
+RewriteEngine On
+
+# Route /submit-registration to submit-registration.php
+RewriteRule ^submit-registration$ submit-registration.php [L,QSA]
+
+# Ensure PHP files are handled by the PHP interpreter
+<FilesMatch "\.php$">
+    SetHandler application/x-httpd-php
+</FilesMatch>
