@@ -1,49 +1,67 @@
-# User Registration System
+# User Registration System (Supabase)
 
-A complete user registration form with server-side validation, database storage via PDO, and user feedback with styled success/error messages.
+A complete user registration form with Supabase PostgreSQL storage, server-side validation, and styled success/error messages. Includes a PHP backend as an alternative.
+
+## Quick Start (Supabase — Recommended)
+
+1. Go to [supabase.com](https://supabase.com) and create a project
+2. Open **SQL Editor** → paste `db_setup.sql` → **Run**
+3. Open `index.html` through a local server (see below)
+4. Fill out the form and submit — data goes directly into your Supabase database
+
+### Local Server Options
+
+**Python:**
+```bash
+cd C:\Users\Nedu\Desktop\assignment
+python -m http.server 8000
+# Open http://localhost:8000/index.html
+```
+
+**Node.js:**
+```bash
+npx serve .
+```
+
+**XAMPP:** Place folder in `htdocs/` and open `http://localhost/assignment/`
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `index.html` | Registration form with 8 fields |
-| `submit-registration.php` | Server-side handler (validation, PDO insert, redirect with feedback) |
-| `db_setup.sql` | Database schema |
-| `ca-cert.pem` | SSL CA certificate for Aiven Cloud MySQL |
-| `.htaccess` | Apache URL rewrite rule for `/submit-registration` |
-| `nginx.conf` | Nginx configuration example |
-| `Dockerfile` | Docker image with Apache + PHP 8.2 + PDO MySQL |
-| `apache-vhost.conf` | Apache virtual host config (used in Docker) |
+| `index.html` | Registration form with Supabase client (vanilla JS, no Edge Function needed) |
+| `submit-registration.php` | PHP backend using PDO_PGSQL (alternative) |
+| `db_setup.sql` | PostgreSQL schema |
+| `.env.example` | Environment variable template |
+| `.htaccess` | URL rewrite for PHP backend |
+| `.gitignore` | Ignores .env, logs, etc. |
 
-## Aiven Deployment
+## Supabase Details
 
-Since you are deploying to Aiven Runtime (containerized), build and deploy using the included Dockerfile:
+Your credentials are already configured in `index.html`:
+- **Project URL:** `https://rwlmzeqiniruoqcwpyim.supabase.co`
+- **Anon Key:** Configured in the `<script type="module">` section
+- **Table:** `users` (created by `db_setup.sql`)
 
-1. Build the Docker image:
-   ```bash
-   docker build -t registration-app .
-   ```
-2. Run locally to test:
-   ```bash
-   docker run -p 8080:80 registration-app
-   ```
-3. Push to your Git repo and deploy via Aiven Runtime.
+To view submitted data: Supabase Dashboard → Table Editor → `users`
 
-The Dockerfile includes PHP 8.2 with Apache and the PDO MySQL extension. The `apache-vhost.conf` enables URL rewriting so `/submit-registration` resolves to `submit-registration.php`.
+## PHP Backend (Alternative)
 
-## Database Setup
+If you prefer PHP, configure `submit-registration.php`:
 
-Import `db_setup.sql` into your Aiven MySQL database:
-
-```bash
-mysql -u avnadmin -p -h mysql-3b5bf10a-ifediorahsamuels-63da.e.aivencloud.com -P 17298 --ssl-ca=ca-cert.pem < db_setup.sql
+```php
+define('DB_HOST', 'aws-0-eu-west-2.pooler.supabase.com');
+define('DB_PORT', '5432');
+define('DB_NAME', 'postgres');
+define('DB_USER', 'postgres.rwlmzeqiniruoqcwpyim');
+define('DB_PASS', 'your-password'); // Set your Supabase DB password
 ```
 
-Ensure `ca-cert.pem` is in the same directory as `submit-registration.php`.
-
-## Local Development
-
-Serve the files through a PHP-enabled web server (e.g., XAMPP, WAMP, MAMP) and navigate to `index.html`. For clean URLs locally, configure URL rewriting for `/submit-registration` to `submit-registration.php` using `.htaccess` or `nginx.conf`.
+Then:
+1. Ensure `php-pdo_pgsql` extension is enabled
+2. Serve via PHP server: `php -S localhost:8000`
+3. Change `BACKEND` in `index.html` to `'php'`
+4. Open `http://localhost:8000/index.html`
 
 ## Form Fields
 
@@ -60,17 +78,14 @@ Serve the files through a PHP-enabled web server (e.g., XAMPP, WAMP, MAMP) and n
 ## How It Works
 
 1. User fills out the form and clicks **Submit**.
-2. Form sends a **POST** request to `/submit-registration`.
-3. `submit-registration.php` validates all inputs server-side.
-4. On validation errors, redirects back to `index.html` with error messages.
-5. On success, inserts data into `users` table via **PDO prepared statements**, then redirects with a success message.
-6. JavaScript on `index.html` reads URL query params and displays styled success/error messages.
+2. JavaScript uses the **Supabase client** (`@supabase/supabase-js` from CDN) to insert data directly into the `users` table.
+3. On success, displays a green success message.
+4. On error (validation or database), displays a red error message with details.
+5. A debug panel shows technical details for troubleshooting.
 
-## Troubleshooting 405 Errors
+## Troubleshooting
 
-A 405 (Method Not Allowed) on form submission means the server cannot route `/submit-registration` to the PHP handler:
-
-- **Aiven Runtime**: Ensure the `Dockerfile` builds with Apache and `mod_rewrite` enabled. The `apache-vhost.conf` must set `AllowOverride All`.
-- **Local Apache**: Enable `mod_rewrite` and set `AllowOverride All` in your virtual host.
-- **Nginx**: Add the `location = /submit-registration` block from `nginx.conf` to your server config.
-- **Any platform**: Verify PHP POST requests are supported and the web server routes POST to the PHP handler.# user-form
+- **CORS issues:** Make sure you open `index.html` via `http://localhost` (not `file://`).
+- **405 on PHP:** Ensure `.htaccess` is active and `mod_rewrite` is enabled.
+- **Table not found:** Run `db_setup.sql` in Supabase SQL Editor.
+- **RLS blocking insert:** In Supabase SQL Editor, run `ALTER TABLE users DISABLE ROW LEVEL SECURITY;` (the anon key bypasses RLS for direct client usage if RLS policies allow it).

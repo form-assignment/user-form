@@ -1,27 +1,26 @@
 <?php
-define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-define('DB_PORT', getenv('DB_PORT') ?: '3306');
-define('DB_NAME', getenv('DB_NAME') ?: 'registration_db');
-define('DB_USER', getenv('DB_USER') ?: '');
-define('DB_PASS', getenv('DB_PASS') ?: '');
-define('DB_SSL_CA', __DIR__ . '/ca-cert.pem');
+// Supabase (PostgreSQL) connection via PDO_PGSQL
+// Replace these with your Supabase project credentials
+define('DB_HOST', 'aws-0-eu-west-2.pooler.supabase.com');
+define('DB_PORT', '5432');
+define('DB_NAME', 'postgres');
+define('DB_USER', 'postgres.rwlmzeqiniruoqcwpyim');
+define('DB_PASS', 'HAALAND9d#3');
 
 function getDBConnection() {
     try {
-        $dsn = 'mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';charset=utf8mb4';
-        $pdo = new PDO($dsn, DB_USER, DB_PASS, [
-            PDO::MYSQL_ATTR_SSL_CA => DB_SSL_CA,
-            PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => true,
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        ]);
+        $dsn = 'pgsql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';sslmode=require';
+        $pdo = new PDO($dsn, DB_USER, DB_PASS);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         return $pdo;
     } catch (PDOException $e) {
-        return null;
+        die(json_encode(['success' => false, 'message' => 'Database connection failed: ' . $e->getMessage()]));
     }
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: index.html?status=error&message=' . urlencode('Method not allowed.'));
+    http_response_code(405);
+    echo json_encode(['success' => false, 'message' => 'Method not allowed']);
     exit;
 }
 
@@ -71,20 +70,16 @@ if (strlen($bio) > 500) {
 }
 
 if (!empty($errors)) {
-    header('Location: index.html?status=error&message=' . urlencode(implode(' ', $errors)));
+    echo json_encode(['success' => false, 'message' => 'Validation failed.', 'errors' => $errors]);
     exit;
 }
 
 try {
     $pdo = getDBConnection();
 
-    if ($pdo === null) {
-        header('Location: index.html?status=error&message=' . urlencode('Database connection failed. Please try again later.'));
-        exit;
-    }
-
     $sql = "INSERT INTO users (full_name, email, age, gender, country, interests, bio, created_at)
-            VALUES (:full_name, :email, :age, :gender, :country, :interests, :bio, NOW())";
+            VALUES (:full_name, :email, :age, :gender, :country, :interests, :bio, NOW())
+            RETURNING id";
 
     $stmt = $pdo->prepare($sql);
 
@@ -100,10 +95,14 @@ try {
 
     $stmt->execute();
 
-    header('Location: index.html?status=success&message=' . urlencode('Registration successful! Welcome, ' . $fullName . '.'));
-    exit;
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    echo json_encode([
+        'success' => true,
+        'message' => 'Registration successful! Welcome, ' . htmlspecialchars($fullName) . '.',
+        'user_id' => $row['id'] ?? null
+    ]);
 } catch (PDOException $e) {
-    header('Location: index.html?status=error&message=' . urlencode('Database error: ' . $e->getMessage()));
-    exit;
+    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
 }
 ?>

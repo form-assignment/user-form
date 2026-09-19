@@ -12,13 +12,13 @@
         }
         body {
             font-family: Arial, sans-serif;
-            background-color: beige;
+            background-color: #f4f4f4;
             display: flex;
             justify-content: center;
             padding: 40px 20px;
         }
         .form-container {
-            background: whitesmoke;
+            background: #fff;
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -89,17 +89,16 @@
         button[type="submit"]:hover {
             background-color: #45a049;
         }
+        button[type="submit"]:disabled {
+            background-color: #a5d6a7;
+            cursor: not-allowed;
+        }
         button[type="reset"] {
             background-color: #f44336;
             color: white;
         }
         button[type="reset"]:hover {
             background-color: #da190b;
-        }
-        .error {
-            color: #d32f2f;
-            font-size: 13px;
-            margin-top: 4px;
         }
         .required::after {
             content: " *";
@@ -125,13 +124,24 @@
             border: 1px solid #f5c6cb;
             display: block;
         }
+        .debug-info {
+            margin-top: 12px;
+            padding: 8px;
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #856404;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="form-container">
         <h1>User Registration</h1>
         <div id="message"></div>
-        <form action="/submit-registration" method="POST">
+        <div id="debug-info" class="debug-info"></div>
+        <form id="registration-form">
             <div class="form-group">
                 <label for="full_name" class="required">Full Name</label>
                 <input type="text" id="full_name" name="full_name" required>
@@ -185,28 +195,86 @@
 
             <div class="btn-group">
                 <button type="reset">Reset</button>
-                <button type="submit">Submit</button>
+                <button type="submit" id="submit-btn">Submit</button>
             </div>
         </form>
     </div>
-    <script>
-        (function() {
-            var params = new URLSearchParams(window.location.search);
-            var status = params.get('status');
-            var message = params.get('message');
-            if (status && message) {
-                var msgDiv = document.getElementById('message');
-                msgDiv.className = 'message ' + status;
-                msgDiv.textContent = message;
-                if (status === 'success') {
-                    setTimeout(function() {
-                        window.history.replaceState({}, document.title, window.location.pathname);
-                        msgDiv.className = 'message';
-                        msgDiv.textContent = '';
-                    }, 5000);
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+        const SUPABASE_URL = 'https://rwlmzeqiniruoqcwpyim.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ3bG16ZXFpbmlydW9xY3dweWltIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3NTc2MTAsImV4cCI6MjEwNTMzMzYxMH0.hdGdw1NJt5z0_jyXXqrfeB7ScbvzxK7brupJcGm3LeE';
+
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const msgDiv = document.getElementById('message');
+        const debugDiv = document.getElementById('debug-info');
+        const submitBtn = document.getElementById('submit-btn');
+
+        function showMessage(text, type) {
+            msgDiv.textContent = text;
+            msgDiv.className = 'message ' + type;
+        }
+
+        function clearMessage() {
+            msgDiv.textContent = '';
+            msgDiv.className = 'message';
+            debugDiv.style.display = 'none';
+        }
+
+        document.getElementById('registration-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            clearMessage();
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+
+            const formData = {
+                full_name: document.getElementById('full_name').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                age: document.getElementById('age').value || null,
+                gender: document.querySelector('input[name="gender"]:checked')?.value || '',
+                country: document.getElementById('country').value,
+                interests: Array.from(document.querySelectorAll('input[name="interests[]"]:checked')).map(cb => cb.value),
+                bio: document.getElementById('bio').value.trim(),
+            };
+
+            try {
+                const { data, error } = await supabase
+                    .from('users')
+                    .insert({
+                        full_name: formData.full_name,
+                        email: formData.email,
+                        age: formData.age !== null && formData.age !== '' ? Number(formData.age) : null,
+                        gender: formData.gender,
+                        country: formData.country,
+                        interests: formData.interests.join(', '),
+                        bio: formData.bio,
+                    })
+                    .select();
+
+                if (error) {
+                    showMessage(error.message, 'error');
+                    debugDiv.textContent = 'Error details: ' + JSON.stringify(error);
+                    debugDiv.style.display = 'block';
+                } else {
+                    showMessage('Registration successful! Welcome, ' + formData.full_name + '.', 'success');
+                    document.getElementById('registration-form').reset();
+                    setTimeout(clearMessage, 5000);
                 }
+            } catch (err) {
+                showMessage('Network error: ' + err.message, 'error');
+                debugDiv.textContent = 'Details: ' + err.message + '. Check browser console for more info.';
+                debugDiv.style.display = 'block';
+                console.error('Full error:', err);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit';
             }
-        })();
+        });
+
+        document.querySelector('button[type="reset"]').addEventListener('click', function() {
+            clearMessage();
+        });
     </script>
 </body>
 </html>
